@@ -10,8 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class FixedTermController extends Controller
 {
-    public function simulateFixedTerm(Request $request){
-        $interestRate = env('INTEREST_RATE', 0.2); 
+    public function simulateFixedTerm(Request $request)
+    {
+        $currentUser = auth()->user();
+        $interestRate = env('INTEREST_RATE');
 
         $validator = Validator::make($request->all(), [
             'amount' => 'required|numeric|min:0',
@@ -19,15 +21,24 @@ class FixedTermController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 400);
+            return response()->badRequest(['errors' => $validator->errors()], 400);
         }
+        
 
         $amount = $request->input('amount');
         $duration = $request->input('duration');
 
-        $interest = $interestRate * $duration; 
-        $totalInterest = $amount * $interestRate * $duration / 100; 
-        $totalAmount = $amount + $totalInterest; 
+        $account = Account::where('user_id', $currentUser->id)
+        ->where('currency', 'ARS')
+        ->first();
+
+        if (!$account || $account->balance < $amount) {
+            return response()->badRequest(['message' => 'No cuentas con los fondos para realizar la transferencia']);
+        }
+
+        $interest = $interestRate * $duration;
+        $totalInterest = $amount * $interestRate * $duration / 100;
+        $totalAmount = $amount + $totalInterest;
 
         $simulationDetails = [
             'creation_date' => now()->format('Y-m-d'),
@@ -37,8 +48,9 @@ class FixedTermController extends Controller
             'total_to_receive' => $totalAmount,
         ];
 
-        return response()->json($simulationDetails, 200);
+        return response()->ok($simulationDetails);
     }
+
     public function store(Request $request)
     {
         $currentUser = auth()->user();
@@ -51,7 +63,7 @@ class FixedTermController extends Controller
             ]);
         } catch (ValidationException $e) {
             $errors = $e->validator->errors();
-            return response()->validationError($errors);
+            return response()->badRequest($errors);
         }
 
         $amount = $request->input('amount');
@@ -61,7 +73,7 @@ class FixedTermController extends Controller
             ->first();
 
         if (!$account || $account->balance < $amount) {
-            return response()->validationError();
+            return response()->badRequest(['message' => 'No cuentas con los fondos para realizar la transferencia']);
         }
 
         $duration = $request->input('duration');

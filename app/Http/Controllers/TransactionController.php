@@ -108,6 +108,7 @@ class TransactionController extends Controller
             return response()->badRequest(['message' => $errorMessage]);
         }
     }
+
     public function depositMoney(Request $request)
     {
         // Validar los datos de la solicitud
@@ -152,6 +153,7 @@ class TransactionController extends Controller
 
         return response()->ok(['message' => 'Depósito realizado con éxito', 'transaction' => $depositTransaction, 'account' => $account]);
     }
+
     public function makePayment(Request $request)
     {
         // Validar los datos de la solicitud
@@ -203,10 +205,9 @@ class TransactionController extends Controller
         return response()->ok(['message' => 'Pago realizado con éxito', 'transaction' => $paymentTransaction, 'account' => $account]);
     }
 
-
     public function edit(Request $request, $id)
     {
-       $currentUser = auth()->user();
+        $currentUser = auth()->user();
         $transaction = Transaction::where('id', $id)->first();
         $account = Account::where('id', $transaction->account_id)->first();
 
@@ -224,7 +225,7 @@ class TransactionController extends Controller
         }
 
         $transaction->update(['description' => $request->input('description')]);
-         
+
         return response()->ok();
     }
 
@@ -249,28 +250,22 @@ class TransactionController extends Controller
             return response()->ok(['message' => 'El usuario no tiene transacciones asociadas']);
         }
 
-            // Verificar si el usuario es administrador
-    $adminRole = Role::where('name', 'ADMIN')->first();
-    if ($adminRole && $user->role_id === $adminRole->id) {
-        // Paginar las transacciones
-        $page = request()->get('page');
-        if (!is_numeric($page) || $page < 1) {
-            return response()->json(['error' => 'The "page" parameter must be an integer greater than or equal to 1'], 400);
+        // Verificar si el usuario es administrador
+        $adminRole = Role::where('name', 'ADMIN')->first();
+        if ($adminRole && $user->role_id === $adminRole->id) {
+            // Paginar las transacciones
+            $page = request()->get('page');
+
+            $transactions = Transaction::whereIn('account_id', $accounts->pluck('id'))->paginate(10);
+            $transactions->appends(['page' => $page]);
+
+            // Devolver la respuesta
+            return response()->ok($transactions);
+        } else {
+            // Devolver las transacciones del usuario
+            return response()->unauthorized();
         }
-
-        $transactions = Transaction::whereIn('account_id', $accounts->pluck('id'))->paginate(10);
-        $transactions->appends(['page' => $page]);
-
-        // Devolver la respuesta
-        return response()->ok(['transactions' => $transactions]);
-    } else {
-        // Devolver las transacciones del usuario
-        return response()->ok(['transactions' => $transactions]);
     }
-    }
-
-
-
 
     public function showTransaction($id)
     {
@@ -289,7 +284,4 @@ class TransactionController extends Controller
             return response()->notFound(['message' => 'Transacción no autorizada para el usuario actual']);
         }
     }
-
-
-
 }

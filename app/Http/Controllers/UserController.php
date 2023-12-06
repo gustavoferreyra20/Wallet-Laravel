@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Account;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Hash;
@@ -48,15 +49,15 @@ class UserController extends Controller
 
             // Paginar los usuarios 
             $users = $query->paginate(10);
-            
-            return response()->json($users);
-            
+
+            return response()->ok($users);
         } else {
-            return response()->json(['error' => 'No tienes acceso a este endpoint']);
+            return response()->unauthorized();
         }
     }
-    
-    public function update(Request $request){
+
+    public function update(Request $request)
+    {
         try {
             $user = JWTAuth::user();
 
@@ -69,7 +70,7 @@ class UserController extends Controller
 
             // No se permite actualizar email ni rol
             if ($request->has('email') || $request->has('role_id')) {
-                return response()->json(['error' => 'No se puede actualizar email ni rol'], 400);
+                return response()->badRequest(['message' => 'No se puede actualizar email ni rol'], 400);
             }
 
             // Actualizar campos permitidos
@@ -88,14 +89,20 @@ class UserController extends Controller
             // Guardar los cambios en el usuario
             $user->save();
 
-            return response()->json(['message' => 'Datos actualizados con éxito', 'user' => $user]);
-
+            return response()->ok(['message' => 'Datos actualizados con éxito', 'user' => $user]);
         } catch (ValidationException $e) {
             $errors = $e->validator->errors();
-            return response()->json(['error' => $errors], 422);
+            return response()->badRequest(['error' => $errors]);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Error al procesar la solicitud'], 500);
+            return response()->internalServerError(['error' => 'Error al procesar la solicitud']);
         }
-    }    
     }
 
+    public function details(Request $request)
+    {
+        $currentUser = auth()->user();
+        $accounts = Account::where('user_id', $currentUser->id)->get();
+
+        return response()->ok(['user' => $currentUser, 'accounts' => $accounts]);
+    }
+}
